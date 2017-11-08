@@ -31,7 +31,7 @@ object LSH {
     val shingled : RDD[(Long, TraversableOnce[Int])] = preprocessed.map {case (key, document) => (key, shingle(document))}
     val minHashed = shingled.map {case (key, shingleList) => (key, minHash(shingleList, sharedHashFunctions.value))}
 
-    val similaritites : RDD[(Long, Long, Double)] =
+    val similarities : RDD[(Long, Long, Double)] =
       minHashed.cartesian(minHashed)
         .filter{ case ((key, _),(key2, _)) => key > key2}
         .map{case ((key, signature),(key2, signature2)) => (key, key2, findSimilarity(signature, signature2))}

@@ -17,13 +17,13 @@ object HW1 {
   val BAND_SIMILARITY_THRESHOLD = 0.1
   val NUMBER_OF_BANDS = 10
   val NUMBER_OF_ROWS = 5
-
+  val NUMBER_OF_HASHFUNCTIONS = 50
 
   def main(args: Array[String]): Unit = {
     System.setProperty("hadoop.home.dir", "D:\\winutils")
 
-    val sc = new SparkContext("local[*]", "TestProgram")
-    val sharedHashFunctions = sc.broadcast(getHashFunctions(50))
+    val sc = new SparkContext("local[8]", "LSH")
+    val sharedHashFunctions = sc.broadcast(getHashFunctions(NUMBER_OF_HASHFUNCTIONS))
 
     val textFile = sc.textFile("./dataset/SMSSpamCollection.txt")
     val documents : RDD[(String, Long)] = textFile.zipWithIndex()

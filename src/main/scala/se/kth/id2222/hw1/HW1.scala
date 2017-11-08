@@ -11,27 +11,41 @@ import scala.util.Random
   */
 object HW1 {
 
-  val SHINGLE_LENGTH = 9
+  val SHINGLE_LENGTH = 5
   val PRIME = 2147483647
+  val SIMILARITY_THRESHOLD = 0.6
+  val BAND_SIMILARITY_THRESHOLD = 0.1
+  val NUMBER_OF_BANDS = 10
+  val NUMBER_OF_ROWS = 5
 
 
   def main(args: Array[String]): Unit = {
     System.setProperty("hadoop.home.dir", "D:\\winutils")
 
     val sc = new SparkContext("local[*]", "TestProgram")
-    val sharedHashFunctions = sc.broadcast(getHashFunctions(5))
+    val sharedHashFunctions = sc.broadcast(getHashFunctions(50))
 
     val textFile = sc.textFile("./dataset/SMSSpamCollection.txt")
     val documents : RDD[(String, Long)] = textFile.zipWithIndex()
     val preprocessed : RDD[(Long, String)] = documents.map { case (document, id) => (id, preprocessDocument(document)) }
     val shingled : RDD[(Long, TraversableOnce[Int])] = preprocessed.map {case (key, document) => (key, shingle(document))}
     val minHashed = shingled.map {case (key, shingleList) => (key, minHash(shingleList, sharedHashFunctions.value))}
+
     val similaritites : RDD[(Long, Long, Double)] =
       minHashed.cartesian(minHashed)
         .filter{ case ((key, _),(key2, _)) => key > key2}
-          .map{case ((key, signature),(key2, signature2)) => (key, key2, findSimilarity(signature, signature2))}
+        .map{case ((key, signature),(key2, signature2)) => (key, key2, findSimilarity(signature, signature2))}
+        .filter{case (_, _, similarity) => similarity > SIMILARITY_THRESHOLD}
 
-    similaritites.saveAsTextFile("./target/results" + System.currentTimeMillis())
+    val bands : RDD[(Long, TraversableOnce[Int])] = minHashed.map{case (key, signature) => (key, signatureToHashedBandsOfRows(signature.toList,
+      NUMBER_OF_BANDS, NUMBER_OF_ROWS))}
+
+    val lshResult = bands.cartesian(bands)
+      .map{case ((key1, bands1),(key2, bands2)) => (key1, key2, findSimilarity(bands1, bands2))}
+      .filter{case (_, _, similarity) => similarity > BAND_SIMILARITY_THRESHOLD}
+
+    lshResult.saveAsTextFile("./target/results" + System.currentTimeMillis())
+
   }
 
   def preprocessDocument(document : String) : String = {
@@ -86,5 +100,18 @@ object HW1 {
     val intersection = ints.toIndexedSeq.intersect(ints1.toIndexedSeq)
     val union = ints.toIndexedSeq.union(ints1.toIndexedSeq).distinct
     intersection.size.toDouble / union.size
+  }
+
+  def signatureToHashedBandsOfRows(signature: List[Int], numberOfBands : Int, numberOfRowsInBand : Int) : List[Int] = {
+    if (signature.size != numberOfBands * numberOfRowsInBand)
+      throw new IllegalArgumentException("Wrong arguments number of bands times number of rows should equal length of signature")
+    var i = 0
+    val bands = new ArrayBuffer[List[Int]]()
+    while (i + numberOfRowsInBand <= signature.length) {
+      bands.append(signature.slice(i, i + numberOfRowsInBand))
+      i += numberOfRowsInBand
+    }
+
+    bands.map(band => band.hashCode()).toList
   }
 }

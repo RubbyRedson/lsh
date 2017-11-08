@@ -9,7 +9,7 @@ import scala.util.Random
 /**
   * Created by Nick on 11/6/2017.
   */
-object HW1 {
+object LSH {
 
   val SHINGLE_LENGTH = 5
   val PRIME = 2147483647

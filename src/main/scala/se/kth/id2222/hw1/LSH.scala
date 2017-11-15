@@ -6,15 +6,12 @@ import org.apache.spark.rdd.RDD
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
-/**
-  * Created by Nick on 11/6/2017.
-  */
 object LSH {
 
   val SHINGLE_LENGTH = 5
   val PRIME = 2147483647
-  val SIMILARITY_THRESHOLD = 0.6
-  val BAND_SIMILARITY_THRESHOLD = 0.1
+  val SIMILARITY_THRESHOLD = 0.001
+  val BAND_SIMILARITY_THRESHOLD = 0.001
   val NUMBER_OF_BANDS = 10
   val NUMBER_OF_ROWS = 5
   val NUMBER_OF_HASHFUNCTIONS = 50
@@ -40,11 +37,14 @@ object LSH {
     val bands : RDD[(Long, TraversableOnce[Int])] = minHashed.map{case (key, signature) => (key, signatureToHashedBandsOfRows(signature.toList,
       NUMBER_OF_BANDS, NUMBER_OF_ROWS))}
 
+    bands.cache()
+
     val lshResult = bands.cartesian(bands)
       .map{case ((key1, bands1),(key2, bands2)) => (key1, key2, findSimilarity(bands1, bands2))}
       .filter{case (_, _, similarity) => similarity > BAND_SIMILARITY_THRESHOLD}
 
-    lshResult.saveAsTextFile("./target/results" + System.currentTimeMillis())
+    lshResult.collect().foreach(println)
+    //lshResult.saveAsTextFile("./target/results" + System.currentTimeMillis())
 
   }
 

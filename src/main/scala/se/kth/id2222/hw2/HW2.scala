@@ -5,8 +5,6 @@ import org.apache.spark.rdd.RDD
 
 object HW2 {
 
-  val s = 0.03
-  val c = 0.003
 
   def main(args: Array[String]): Unit = {
     System.setProperty("hadoop.home.dir", "D:\\winutils")
@@ -17,13 +15,16 @@ object HW2 {
 
     val numberOfTransactions = transactions.count()
 
+    val s = 0.005 * numberOfTransactions
+    val c = 0.01
+
     // First we find the frequent items in the transactions
     val frequentItems =
       transactions
       .flatMap { case (transaction, _) => emitItems(transaction) }
       .reduceByKey(_ + _)
-      .map { case (transaction, count) => (count / numberOfTransactions.toDouble, transaction) }
-      .filter{ case (frequency, _) => frequency > s }
+      .map { case (transaction, count) => (count, transaction) }
+      .filter{ case (support, _) => support > s }
       .sortByKey(false)
 
 
@@ -33,13 +34,23 @@ object HW2 {
     val frequentPairs = transactions
       .flatMap { case (transaction, _) => emitDuos(transaction, frequentItemsAsSet) }
       .reduceByKey(_ + _)
-      .map { case (transaction, count) => (count / numberOfTransactions.toDouble, transaction) }
-      .filter{ case (frequency, _) => frequency > c}
+      .map { case (transaction, count) => (count, transaction) }
+      .filter{ case (support, _) => support > s}
       .sortByKey(false)
 
     frequentPairs.top(10).foreach(println)
     println(frequentPairs.count())
 
+    frequentItems.cache()
+    frequentPairs.cache()
+
+    val associationRulesPairToItem = frequentPairs.cartesian(frequentItems)
+      .filter {case ((_, pair), (_, item)) => pair.split(" ").contains(item)}
+      .filter {case ((pairSpport, pair), (itemSupport, item)) => pairSpport / itemSupport.toDouble > c}
+      .map {case ((pairSpport, pair), (itemSupport, item)) => (pairSpport / itemSupport.toDouble, pair.split(" ").filter(itemInPair => item != itemInPair).head + " => " + item)}
+      .sortByKey(false)
+
+    associationRulesPairToItem.foreach(println)
 
 //    transactions.collect().foreach(println)
     //lshResult.saveAsTextFile("./target/results" + System.currentTimeMillis())

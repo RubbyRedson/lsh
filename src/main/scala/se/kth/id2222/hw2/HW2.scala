@@ -93,7 +93,7 @@ object HW2 {
     }
 
     frequentItemsets
-      .filter { case (_, itemset) => itemset.split(" ").length > 1 }
+      .filter { case (_, itemset) => itemset.trim().split(" ").length > 1 }
       .flatMap { case (support, itemset) => checkConfidence(itemset, support, frequentItemsetsAsMap.toMap, c) }
       .sortByKey(false)
       .foreach(println)
@@ -154,9 +154,9 @@ object HW2 {
   def checkConfidence(itemset: String, support: Int, mapOfItemsets: Map[String, Int], confidenceLevel: Double): TraversableOnce[(Double, String)] = {
     val result = new ArrayBuffer[(Double, String)]()
     itemset.split(" ").foreach(item => {
-      val itemsetWithoutItem = itemset.split(" ").filter(item1 => item1 != item)
+      val itemsetWithoutItem = itemset.split(" ").filter(item1 => item1 != item && !item.isEmpty && !item1.isEmpty)
       val subsetAsStr = itemsetWithoutItem.toSeq.sorted.fold(z = "")((z, a) => z.trim() + " " + a)
-      if (itemsetWithoutItem.length > 0 && mapOfItemsets.contains(subsetAsStr)) {
+      if (itemsetWithoutItem.length > 0 && mapOfItemsets.contains(subsetAsStr.trim())) {
         val supportOfSubset = mapOfItemsets(subsetAsStr.trim())
         if (support / supportOfSubset.toDouble > confidenceLevel) result.append((support / supportOfSubset.toDouble, subsetAsStr + " => " + item))
       }

@@ -67,6 +67,7 @@ object HW2 {
   }
 
   def complex(transactions: RDD[(String, Long)], s: Int, c: Double) = {
+    // For conevenience tirst we build the set of frequent items
     val frequentItems =
       transactions
         .flatMap { case (transaction, _) => emitItems(transaction) }
@@ -76,9 +77,10 @@ object HW2 {
         .sortByKey(false)
 
 
-    frequentItems.top(10).foreach(println)
+    //frequentItems.top(10).foreach(println)
     val frequentItemsAsSet = frequentItems.map { case (_, item) => item }.collect().toSet
 
+    // We generate the frequent itemsets
     val frequentItemsets = transactions.flatMap { case (transaction, _) => emitItemsets(transaction, 3, frequentItemsAsSet) }
       .map { itemSet => (itemSet.toSeq.sorted.fold(z = "")((z, a) => z.trim() + " " + a), 1) }
       .reduceByKey(_ + _)
@@ -86,12 +88,14 @@ object HW2 {
       .filter { case (support, _) => support > s }
       .sortByKey(false)
 
+    // For convenience, build a map of itemset to support
     val frequentItemsetsAsMap: mutable.Map[String, Int] = new mutable.HashMap[String, Int]()
     frequentItemsets.collect().foreach { case (support: Int, itemset: String) => {
       frequentItemsetsAsMap.put(itemset.trim(), support)
     }
     }
 
+    // We generate the association rules
     frequentItemsets
       .filter { case (_, itemset) => itemset.trim().split(" ").length > 1 }
       .flatMap { case (support, itemset) => checkConfidence(itemset, support, frequentItemsetsAsMap.toMap, c) }
@@ -123,13 +127,17 @@ object HW2 {
   }
 
   def emitItemset(transaction: String, length: Int, setOfFrequentItems: Set[String]): TraversableOnce[Set[String]] = {
+    // This method is used to emit all of the itemsets of a given length by incrementally constructing them
+    // If it is 1 or 2 then we just emit frequent items, or frequent pairs
     if (length == 1) return emitItems(transaction).map { case (str, int) => str.split(" ").toSet }
     if (length == 2) return emitDuos(transaction, setOfFrequentItems).map { case (str, int) => str.split(" ").toSet }
 
+    // for larger length we append the frequent items present in transaction to have triplets and so on (A-priori method)
     val pairs = emitDuos(transaction, setOfFrequentItems)
     val items = emitItems(transaction)
     var currentSize = 2
 
+    // Just a messy way to generate the itemsets
     var itemsets = new ArrayBuffer[Array[String]]()
     pairs.foreach(pair => itemsets.append((pair._1.split(" "))))
     while (currentSize < length) {
@@ -137,7 +145,7 @@ object HW2 {
       itemsets.foreach(itemset => setOfFrequentItems.filter(item => !itemset.contains(item)).foreach(item => {
         newItemsets.append(itemset :+ item)
       }))
-      if (newItemsets.nonEmpty) {
+      if (newItemsets.nonEmpty) { //continue if we still are able to generate itemsets of greater length
         currentSize += 1
         itemsets = newItemsets
       }
@@ -153,6 +161,7 @@ object HW2 {
 
   def checkConfidence(itemset: String, support: Int, mapOfItemsets: Map[String, Int], confidenceLevel: Double): TraversableOnce[(Double, String)] = {
     val result = new ArrayBuffer[(Double, String)]()
+    //Drop each item from itemset and check if confidence level is enough
     itemset.split(" ").foreach(item => {
       val itemsetWithoutItem = itemset.split(" ").filter(item1 => item1 != item && !item.isEmpty && !item1.isEmpty)
       val subsetAsStr = itemsetWithoutItem.toSeq.sorted.fold(z = "")((z, a) => z.trim() + " " + a)
